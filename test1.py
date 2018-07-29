@@ -189,7 +189,9 @@ class Algorithm(object):
         today=time.strftime('%Y-%m-%d',time.localtime(time.time()))
         li = []
         if Algorithm.pbar == None:
-            Algorithm.pbar = progressbar.ProgressBar(maxval=len(codes))
+            widgets = ['Progress: ',progressbar.Percentage(), ' ', progressbar.Bar('#'),' ', progressbar.Timer(),  
+                               ' ', progressbar.ETA(), ' '] # FileTransferSpeed()]  
+            Algorithm.pbar = progressbar.ProgressBar(widgets=widgets, maxval=len(codes))
             Algorithm.pbar.start()
 
         for v in codes:
