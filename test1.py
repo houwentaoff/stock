@@ -17,6 +17,7 @@ import openpyxl
 from openpyxl.styles import Font, Color
 from openpyxl.styles import colors, PatternFill
 
+import progressbar
 
 def singleton(cls):
     instances = {}
@@ -155,7 +156,7 @@ class StockSimple(object):
         if alias == '流通':
             return self.outstanding
         if alias == '总股本':
-            return self.totals
+            return self.total
         if alias == '流通占比':
             return self.per
 
@@ -168,6 +169,7 @@ class StockSimple(object):
         return str(self.per*100)+'%%'
 
 class Algorithm(object):
+    pbar = None
 
     def __get_oldtime(self, time1, interval):
         inter_time = interval*24*3600
@@ -186,9 +188,13 @@ class Algorithm(object):
         old_day = self.__get_oldtime(time.time(), weight)
         today=time.strftime('%Y-%m-%d',time.localtime(time.time()))
         li = []
+        if Algorithm.pbar == None:
+            Algorithm.pbar = progressbar.ProgressBar(maxval=len(codes))
+            Algorithm.pbar.start()
 
         for v in codes:
             data = ts.get_hist_data(v, start=old_day, end=today, ktype='D')
+            Algorithm.pbar.update(codes.index(v))
             #print(data)
             try:
                 if type(data) == type(None) or type(data['close']) == type(None):
@@ -228,6 +234,7 @@ class Algorithm(object):
                 msg = traceback.format_exc()
                 print(msg)
                 #print ('异常', e)
+        Algorithm.pbar.finish()
         return li        
 
 alg = Algorithm()
