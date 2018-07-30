@@ -108,6 +108,16 @@ class Stocks(object):
         s = StockSimple(code, name, industry, pe, outstanding, total, per)
         return s
 
+    def IsST(self, code):
+        name = self.__stocks.loc[code, 'name']
+        if -1 != name.find('ST'):
+            return True
+        return False
+
+    def GetPE(self, code):
+        pe = self.__stocks.loc[code, 'pe']
+        return pe
+
     def PrintInfo(self, code):
         name = self.__stocks.loc[code, 'name']
         industry  = self.__stocks.loc[code, 'industry']
@@ -179,8 +189,18 @@ class Algorithm(object):
     # 长时间横盘 突然上涨的股票
 #
 #获取当前日期算起Ｎ日的收盘价
-#
-    def HengUp(self, weight=30, updot=4, curupdot=2):
+# 
+    ##
+    # @brief 
+    #
+    # @param weight    横盘天数
+    # @param updot      
+    # @param curupdot  最近一天上涨点数
+    # @param enableST  使能ST
+    # @param pe        PE最大值
+    #
+    # @return          满足条件的股票
+    def HengUp(self, weight=30, updot=4, curupdot=2, enableST=True, pemax=200.0):
         upDotRate = updot/100.0
         curUpDotRate = curupdot/100.0
         stocks = Stocks.GetInstance()
@@ -189,16 +209,22 @@ class Algorithm(object):
         today=time.strftime('%Y-%m-%d',time.localtime(time.time()))
         li = []
         if Algorithm.pbar == None:
-            widgets = ['Progress: ',progressbar.Percentage(), ' ', progressbar.Bar('#'),' ', progressbar.Timer(),  
+            widgets = ['',progressbar.Percentage(), ' ', progressbar.Bar('#'),' ', progressbar.Timer(),  
                                ' ', progressbar.ETA(), ' '] # FileTransferSpeed()]  
             Algorithm.pbar = progressbar.ProgressBar(widgets=widgets, maxval=len(codes))
             Algorithm.pbar.start()
 
         for v in codes:
-            data = ts.get_hist_data(v, start=old_day, end=today, ktype='D')
             Algorithm.pbar.update(codes.index(v))
+            if enableST == False and stocks.IsST(v) == True:
+                continue
+            if stocks.GetPE(v) > pemax:
+                continue
+
+            data = ts.get_hist_data(v, start=old_day, end=today, ktype='D')
             #print(data)
             try:
+                
                 if type(data) == type(None) or type(data['close']) == type(None):
                     continue
                 count = len(data['close'])
@@ -240,7 +266,7 @@ class Algorithm(object):
         return li        
 
 alg = Algorithm()
-li = alg.HengUp(weight=15, updot=4, curupdot=2)
+li = alg.HengUp(weight=27, updot=4, curupdot=2, enableST=False, pemax=200.0)
 # (code, data)
 
 stocks = Stocks.GetInstance()
