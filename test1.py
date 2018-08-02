@@ -180,12 +180,141 @@ class StockSimple(object):
 
 class Algorithm(object):
     pbar = None
+    
+    def IsTRadeDay(self, day):
+        validdates = ts.trade_cal()
+        for d in validdates.values:
+            if d[0] == day:
+                return True
+        return False
+    
+    def __get_day(self, endDay, interDay):
+        validdates = ts.trade_cal()
+        newDayIdx = 0
+        oldday = ''
+        
+        for i in range(len(validdates)):
+            if validdates.values[i][0] == endDay:
+                newDayIdx = i
+                break
+        
+        for i in range(newDayIdx, 0, -1):
+            if validdates.values[i][1] == 1:
+                interDay -= 1
+                if interDay == 0:
+                    oldday = validdates.values[i][0]
+                    break
+        return oldday
 
-    def __get_oldtime(self, time1, interval):
+
+    def __get_oldday(self, now, interval):
+        return self.__get_day(endDay = now, interDay = interval)
+    '''
+        validdates = ts.trade_cal()
+
+        now = time.strftime('%Y-%m-%d',time.localtime(time1))
+
         inter_time = interval*24*3600
         old_time = time.strftime('%Y-%m-%d',time.localtime(time1-inter_time))
         return old_time
+    '''
+    def GetNDayPrice(self, code, day, n=30):
 
+        old_day = self.__get_oldday(day, n)
+        data = ts.get_hist_data(code, start=old_day, end=day, ktype='D')
+        v_price = 0.0
+        try:
+            if type(data) == type(None) or type(data['close']) == type(None):
+                return v_price
+            count = len(data['close'])
+            priceTotal = 0.0
+            if count > n/2:
+                for i in range(0, count):
+                    priceTotal += data['close'][i]
+                v_price = priceTotal/count
+        
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+        return v_price
+    # 长时间横盘,未上涨,
+    ##
+    # @brief 
+    #
+    # @param weight           横盘时间
+    # @param amplitudeDot     中间振幅点数
+    # @param maxjuli_30dPrice 距离30日均线 最大涨幅点数
+    #
+    # @return 
+    def HengNoUp(self, weight=30, amplitudeDot=5, maxjuli_30dPrice=4, enableST=False, pemax=200.0):
+        upDotRate = amplitudeDot/100.0
+        curUpDotRate = 5/100.0
+        perMaxJuli = maxjuli_30dPrice/100.0
+        stocks = Stocks.GetInstance()
+        codes = stocks.GetCodes()
+        today=time.strftime('%Y-%m-%d',time.localtime(time.time()))
+        old_day = self.__get_oldday(today, weight)
+        print(old_day,'-', today, '间隔', weight, '交易日')
+        li = []
+        if Algorithm.pbar == None:
+            widgets = ['',progressbar.Percentage(), ' ', progressbar.Bar('#'),' ', progressbar.Timer(),  
+                               ' ', progressbar.ETA(), ' '] # FileTransferSpeed()]  
+            Algorithm.pbar = progressbar.ProgressBar(widgets=widgets, maxval=len(codes))
+            Algorithm.pbar.start()
+
+        for v in codes:
+            Algorithm.pbar.update(codes.index(v))
+            if enableST == False and stocks.IsST(v) == True:
+                continue
+            if stocks.GetPE(v) > pemax:
+                continue
+
+            data = ts.get_hist_data(v, start=old_day, end=today, ktype='D')
+            #print(data)
+            try:
+                
+                if type(data) == type(None) or type(data['close']) == type(None):
+                    continue
+                count = len(data['close'])
+                if count > weight/2:
+                    begin = data['close'][count - 1]
+                    valid_count = 0
+                    avalid_count = 0
+                    #for vv in data['close']:
+                    for n in range(count-1, -1, -1):
+                        prePrice = data['close'][n]
+                        #print v, code_name_dic[v], vv, "n:", n, "count:", count, "valid:", valid_count
+                        if n != 0:
+                            if abs(prePrice-begin) < upDotRate*begin:
+                                valid_count += 1
+                            else:
+                                if avalid_count > 3:
+                                    break
+                                avalid_count += 1
+                        else:
+                            cur = data['close'][0] 
+                            sec = data['close'][1] 
+                            if cur > sec:
+                                if cur - sec < curUpDotRate*sec:
+                                    # 月线 > 当前价格n个点以内
+                                    v30 = self.GetNDayPrice(code=v, day=today, n=30)
+                                    if v30 > cur * (1+0.01) and v30 < cur * (1+perMaxJuli):
+                                        valid_count += 1
+                    #print "有效个数:", valid_count, " 无效个数:", avalid_count," 总数:", count                
+                    if valid_count >= count-avalid_count:
+                        name = stocks.GetName(v)
+                        print (v, name, '开始价格', begin, '持续天数:', valid_count)
+                        stocks.PrintInfo(v)
+                        
+                        tup = (v, data)
+                        li.append(tup)
+
+            except Exception as e:
+                msg = traceback.format_exc()
+                print(msg)
+                #print ('异常', e)
+        Algorithm.pbar.finish()
+        return li     
     # 长时间横盘 突然上涨的股票
 #
 #获取当前日期算起Ｎ日的收盘价
@@ -205,8 +334,9 @@ class Algorithm(object):
         curUpDotRate = curupdot/100.0
         stocks = Stocks.GetInstance()
         codes = stocks.GetCodes()
-        old_day = self.__get_oldtime(time.time(), weight)
         today=time.strftime('%Y-%m-%d',time.localtime(time.time()))
+        old_day = self.__get_oldday(today, weight)
+        print(old_day,'-', today, '间隔', weight, '交易日')
         li = []
         if Algorithm.pbar == None:
             widgets = ['',progressbar.Percentage(), ' ', progressbar.Bar('#'),' ', progressbar.Timer(),  
@@ -266,7 +396,8 @@ class Algorithm(object):
         return li        
 
 alg = Algorithm()
-li = alg.HengUp(weight=27, updot=4, curupdot=2, enableST=False, pemax=200.0)
+#li = alg.HengUp(weight=30, updot=4, curupdot=2, enableST=False, pemax=200.0)
+li = alg.HengNoUp(weight=30, amplitudeDot=5, maxjuli_30dPrice=4, enableST=False, pemax=200.0)
 # (code, data)
 
 stocks = Stocks.GetInstance()
