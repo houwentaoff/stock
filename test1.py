@@ -285,6 +285,10 @@ class Algorithm(object):
                         prePrice = data['close'][n]
                         #print v, code_name_dic[v], vv, "n:", n, "count:", count, "valid:", valid_count
                         if n != 0:
+                            #d = self.__get_oldday(today, n)
+                            #v30 = self.GetNDayPrice(code=v, day=d, n=30)
+                            #if v30 <= prePrice:
+                            #    break
                             if abs(prePrice-begin) < upDotRate*begin:
                                 valid_count += 1
                             else:
@@ -397,7 +401,7 @@ class Algorithm(object):
 
 alg = Algorithm()
 #li = alg.HengUp(weight=30, updot=4, curupdot=2, enableST=False, pemax=200.0)
-li = alg.HengNoUp(weight=30, amplitudeDot=5, maxjuli_30dPrice=4, enableST=False, pemax=200.0)
+li = alg.HengNoUp(weight=20, amplitudeDot=5, maxjuli_30dPrice=4, enableST=False, pemax=200.0)
 # (code, data)
 
 stocks = Stocks.GetInstance()
